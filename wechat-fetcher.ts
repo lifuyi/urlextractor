@@ -140,6 +140,11 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
       bulletListMarker: '-',
       codeBlockStyle: 'fenced'
     })
+    
+    // Add GFM plugin for table support
+    const { gfm } = await import("turndown-plugin-gfm")
+    turndownService.use(gfm)
+    
     const markdown = turndownService.turndown(result.content || "")
     
     return markdown
