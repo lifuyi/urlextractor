@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
 
-const JINA_FALLBACK = "https://r.jina.ai"
+const DEFAULT_PORT = 3456
 
 interface Args {
   url: string;
   output?: string;
   outputDir?: string;
   timeout?: number;
+  server?: boolean;
+  port?: number;
 }
 
 function parseArgs(): Args {
@@ -15,6 +17,8 @@ function parseArgs(): Args {
   let output: string | undefined
   let outputDir: string | undefined
   let timeout = 30000
+  let server = false
+  let port = DEFAULT_PORT
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
@@ -24,13 +28,21 @@ function parseArgs(): Args {
       outputDir = args[++i]
     } else if (arg === "--timeout" && args[i + 1]) {
       timeout = parseInt(args[++i])
+    } else if (arg === "--server") {
+      server = true
+    } else if (arg === "--port" && args[i + 1]) {
+      port = parseInt(args[++i])
     } else if (!arg.startsWith("--")) {
       url = arg
     }
   }
 
+  if (server) {
+    return { url: "", server, port }
+  }
+
   if (!url) {
-    console.error("用法: wechat-fetcher <url> [-o output.md] [--output-dir dir]")
+    console.error("用法: wechat-fetcher <url> [-o output.md] [--output-dir dir] [--server] [--port 3456]")
     process.exit(1)
   }
 
@@ -74,30 +86,131 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
     const result = await convert(html, { url })
     return result
   } catch {
-    console.log("Defuddle 失败，使用 Jina 备用...")
-    const response = await fetch(`${JINA_FALLBACK}/${url}`, {
-      headers: { Accept: "text/markdown" }
+    console.log("Defuddle 失败，使用 Scrapling + html2text 备用...")
+    
+    // Use Python scrapling script as fallback
+    const pythonScript = `${import.meta.dir}/scrapling_fetch.py`
+    const venvPython = `${import.meta.dir}/.venv/bin/python`
+    const proc = Bun.spawn({
+      cmd: [venvPython, pythonScript, url],
+      env: { ...process.env },
     })
-    if (!response.ok) throw new Error(`Jina 失败: ${response.status}`)
-    return response.text()
+    
+    const stdout = await proc.stdout
+    const text = await Bun.readableStreamToText(stdout)
+    
+    if (text) {
+      return text
+    }
+    
+    throw new Error("Scrapling 转换失败")
   }
 }
 
-async function main() {
-  const { url, output, outputDir, timeout } = parseArgs()
-  
-  let targetUrl = url.startsWith("http") ? url : `https://${url}`
-  console.log(`抓取: ${targetUrl}`)
-  
+async function fetchUrl(targetUrl: string, timeout: number): Promise<{ markdown: string; slug: string }> {
   const html = await fetchWithChrome(targetUrl, timeout)
   console.log("HTML 获取成功，转换为 Markdown...")
   
   const markdown = await htmlToMarkdown(html, targetUrl)
-  
   const slug = generateSlug(targetUrl)
+  
+  return { markdown, slug }
+}
+
+async function main() {
+  const args = parseArgs()
+  
+  if (args.server) {
+    // Server mode
+    const port = args.port || DEFAULT_PORT
+    console.log(`启动服务器在 http://localhost:${port}`)
+    
+    Bun.serve({
+      port,
+      fetch(req) {
+        const url = new URL(req.url)
+        
+        if (url.pathname === "/fetch" && req.method === "POST") {
+          return req.json().then(async (body) => {
+            try {
+              const targetUrl = body.url
+              if (!targetUrl) {
+                return new Response(JSON.stringify({ error: "缺少 URL" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                })
+              }
+              
+              let fullUrl = targetUrl.startsWith("http") ? targetUrl : `https://${targetUrl}`
+              console.log(`抓取: ${fullUrl}`)
+              
+              const { markdown, slug } = await fetchUrl(fullUrl, 30000)
+              
+              const frontmatter = `---
+url: ${fullUrl}
+captured_at: ${new Date().toISOString()}
+
+---
+
+`
+              const fullContent = frontmatter + markdown
+              
+              return new Response(JSON.stringify({ 
+                content: fullContent, 
+                filename: `${slug}.md`,
+                url: fullUrl 
+              }), {
+                headers: { 
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*"
+                }
+              })
+            } catch (err: any) {
+              return new Response(JSON.stringify({ error: err.message }), {
+                status: 500,
+                headers: { 
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*"
+                }
+              })
+            }
+          })
+        }
+        
+        // CORS preflight
+        if (req.method === "OPTIONS") {
+          return new Response(null, {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "POST, OPTIONS",
+              "Access-Control-Allow-Headers": "Content-Type"
+            }
+          })
+        }
+        
+        return new Response("WeChat Fetcher Server running. POST to /fetch with { url: '...' }", {
+          headers: { 
+            "Content-Type": "text/plain",
+            "Access-Control-Allow-Origin": "*"
+          }
+        })
+      }
+    })
+    return
+  }
+  
+  // CLI mode
+  const { url, output, outputDir, timeout } = args
+  
+  let targetUrl = url.startsWith("http") ? url : `https://${url}`
+  console.log(`抓取: ${targetUrl}`)
+  
+  const { markdown, slug } = await fetchUrl(targetUrl, timeout)
+  
   const frontmatter = `---
 url: ${targetUrl}
 captured_at: ${new Date().toISOString()}
+
 ---
 
 `

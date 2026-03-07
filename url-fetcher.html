@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL 内容抓取器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+    h1 { color: #333; margin-bottom: 20px; }
+    .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+    input { flex: 1; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 6px; }
+    button { padding: 12px 24px; font-size: 16px; background: #07c160; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #06ad56; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    #status { padding: 10px; margin-bottom: 20px; border-radius: 6px; display: none; }
+    #status.loading { display: block; background: #fff3cd; color: #856404; }
+    #status.success { display: block; background: #d4edda; color: #155724; }
+    #status.error { display: block; background: #f8d7da; color: #721c24; }
+    #content { background: white; padding: 20px; border-radius: 6px; min-height: 200px; word-wrap: break-word; line-height: 1.6; }
+    #content:empty::before { content: "内容将显示在这里..."; color: #999; }
+    #content a { color: #07c160; text-decoration: none; }
+    #content a:hover { text-decoration: underline; }
+    #content img { max-width: 100%; height: auto; border-radius: 4px; margin: 10px 0; }
+    #content h1, #content h2, #content h3 { margin: 20px 0 10px; color: #333; }
+    #content p { margin: 10px 0; }
+    #content ul, #content ol { margin: 10px 0; padding-left: 20px; }
+    #content code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    #content pre { background: #f4f4f4; padding: 15px; border-radius: 6px; overflow-x: auto; }
+    .saved-files { margin-top: 20px; }
+    .saved-files h3 { margin-bottom: 10px; color: #333; }
+    .file-list { list-style: none; }
+    .file-list li { padding: 8px; background: #e9ecef; margin-bottom: 5px; border-radius: 4px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>URL 内容抓取器</h1>
+  
+  <div class="input-group">
+    <input type="url" id="urlInput" placeholder="输入 URL 地址..." />
+    <button id="fetchBtn">获取内容</button>
+  </div>
+  
+  <div id="status"></div>
+  
+  <div id="content"></div>
+  
+  <div class="saved-files">
+    <h3>已保存的文件</h3>
+    <ul id="fileList" class="file-list"></ul>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('urlInput');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const status = document.getElementById('status');
+    const content = document.getElementById('content');
+    const fileList = document.getElementById('fileList');
+    const API_URL = 'http://localhost:3456';
+
+    function showStatus(message, type) {
+      status.textContent = message;
+      status.className = type;
+    }
+
+    // Simple markdown to HTML converter
+    function markdownToHtml(md) {
+      return md
+        // Code blocks
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Headers
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        // Bold and italic
+        .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Images
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" />')
+        // Links
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+        // Line breaks
+        .replace(/\n/g, '<br>');
+    }
+
+    function generateSlug(url) {
+      try {
+        const urlObj = new URL(url);
+        const path = urlObj.pathname.split('/').filter(Boolean).pop() || '';
+        if (path && path.length > 3) {
+          return path.slice(0, 50).replace(/[^a-zA-Z0-9-]/g, '-');
+        }
+      } catch {}
+      return `article-${Date.now()}`;
+    }
+
+    async function checkServer() {
+      try {
+        const response = await fetch(API_URL, { method: 'GET' });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    async function fetchUrl() {
+      const url = urlInput.value.trim();
+      if (!url) {
+        showStatus('请输入 URL 地址', 'error');
+        return;
+      }
+
+      let targetUrl = url.startsWith('http') ? url : `https://${url}`;
+      
+      fetchBtn.disabled = true;
+      showStatus('正在获取内容...', 'loading');
+      content.innerHTML = '';
+
+      try {
+        // Check if local server is running
+        const serverRunning = await checkServer();
+        
+        if (!serverRunning) {
+          showStatus('本地服务器未运行。请先运行: bun wechat-fetcher.ts --server', 'error');
+          fetchBtn.disabled = false;
+          return;
+        }
+
+        // Use local server (with Playwright/Chrome for CAPTCHA handling)
+        const response = await fetch(`${API_URL}/fetch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || `获取失败: ${response.status}`);
+        }
+        
+        // Display content as HTML (convert markdown)
+        content.innerHTML = markdownToHtml(data.content);
+        showStatus('获取成功！', 'success');
+        
+        // Auto-save to file
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const filename = `${timestamp}-${data.filename}`;
+        
+        // Create downloadable file
+        const blob = new Blob([data.content], { type: 'text/markdown' });
+        const downloadUrl = URL.createObjectURL(blob);
+        
+        // Auto-download
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(downloadUrl);
+        
+        // Add to saved files list
+        const li = document.createElement('li');
+        li.textContent = `${filename} (${new Date().toLocaleTimeString()})`;
+        fileList.insertBefore(li, fileList.firstChild);
+        
+        // Also save to localStorage for persistence
+        const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+        savedFiles.unshift({ filename, url: targetUrl, time: new Date().toISOString() });
+        localStorage.setItem('savedFiles', JSON.stringify(savedFiles.slice(0, 50)));
+        
+      } catch (error) {
+        showStatus(`错误: ${error.message}`, 'error');
+      } finally {
+        fetchBtn.disabled = false;
+      }
+    }
+
+    // Load saved files from localStorage
+    function loadSavedFiles() {
+      const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+      savedFiles.forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = `${file.filename} (${new Date(file.time).toLocaleTimeString()})`;
+        fileList.appendChild(li);
+      });
+    }
+
+    // Check server status on load
+    async function init() {
+      const serverRunning = await checkServer();
+      if (!serverRunning) {
+        showStatus('⚠️ 本地服务器未运行。请先在终端运行: bun wechat-fetcher.ts --server', 'error');
+      }
+    }
+
+    fetchBtn.addEventListener('click', fetchUrl);
+    urlInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') fetchUrl();
+    });
+
+    loadSavedFiles();
+    init();
+  </script>
+</body>
+</html>

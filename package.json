@@ -1,0 +1,28 @@
+{
+  "name": "wechat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lifuyi/urlextractor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lifuyi/urlextractor/issues"
+  },
+  "homepage": "https://github.com/lifuyi/urlextractor#readme",
+  "dependencies": {
+    "defuddle": "^0.10.0",
+    "playwright": "^1.58.2"
+  }
+}
