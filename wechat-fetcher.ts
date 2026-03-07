@@ -65,7 +65,8 @@ function parseArgs(): Args {
     } else if (arg === "--server") {
       server = true
     } else if (arg === "--port" && args[i + 1]) {
-      port = parseInt(args[++i])
+      const parsedPort = parseInt(args[++i], 10)
+      port = isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535 ? DEFAULT_PORT : parsedPort
     } else if (!arg.startsWith("--")) {
       url = arg
     }
@@ -327,19 +328,11 @@ async function main() {
         
                       
         
-                      const frontmatter = `---
+                                            const frontmatter = `---\nurl: ${fullUrl}\ncaptured_at: ${new Date().toISOString()}\n---\n\n`
         
-        url: ${fullUrl}
+                      
         
-        captured_at: ${new Date().toISOString()}
-        
-        
-        
-        ---
-        
-        `
-        
-                      const fullContent = frontmatter + markdown
+                                            const fullContent = frontmatter + markdown
         
                       
         
@@ -363,11 +356,13 @@ async function main() {
         
                       })
         
-                    } catch (err: any) {
+                                        } catch (err: unknown) {
         
-                      console.error("Fetch error:", err)
+                                          console.error("Fetch error:", err)
         
-                      return new Response(JSON.stringify({ error: err.message }), {
+                                          const errorMessage = err instanceof Error ? err.message : String(err)
+        
+                                          return new Response(JSON.stringify({ error: errorMessage }), {
         
                         status: 500,
         
@@ -424,14 +419,9 @@ async function main() {
   
   const { markdown, slug } = await fetchUrl(targetUrl, timeout)
   
-  const frontmatter = `---
-url: ${targetUrl}
-captured_at: ${new Date().toISOString()}
-
----
-
-`
-  const fullContent = frontmatter + markdown
+    const frontmatter = `---\nurl: ${targetUrl}\ncaptured_at: ${new Date().toISOString()}\n---\n\n`
+  
+    const fullContent = frontmatter + markdown
   
   if (output) {
     await Bun.write(output, fullContent)

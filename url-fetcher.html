@@ -90,6 +90,27 @@
       // First escape HTML to prevent injection
       let html = escapeHtml(md);
       
+      // Process tables (GFM format)
+      // Match table rows: | col1 | col2 | col3 |
+      const tableRegex = /(\|[^\n]+\|\n\|[-:\s|]+\|\n)(\|[^\n]+\|\n?)+/g;
+      html = html.replace(tableRegex, (match) => {
+        const lines = match.trim().split('\n');
+        if (lines.length < 2) return match;
+        
+        // First line is header
+        const headerCells = lines[0].split('|').filter(c => c.trim()).map(c => '<th>' + c.trim() + '</th>').join('');
+        const headerRow = '<tr>' + headerCells + '</tr>';
+        
+        // Second line is separator (| --- | --- |), skip it
+        // Remaining lines are data rows
+        const dataRows = lines.slice(2).map(line => {
+          const cells = line.split('|').filter(c => c.trim()).map(c => '<td>' + c.trim() + '</td>').join('');
+          return '<tr>' + cells + '</tr>';
+        }).join('');
+        
+        return '<table style="border-collapse: collapse; width: 100%; margin: 10px 0;"><thead>' + headerRow + '</thead><tbody>' + dataRows + '</tbody></table>';
+      });
+      
       return html
         // Code blocks (must be first to preserve content)
         .replace(/```([\s\S]*?)```/g, (match, code) => {
@@ -113,7 +134,8 @@
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, href) => {
           return '<a href="' + sanitizeUrl(href) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
         })
-        // Line breaks
+        // Line breaks (but not inside tables)
+        .replace(/<\/table>\n?/g, '</table>\n')
         .replace(/\n/g, '<br>');
     }
 
