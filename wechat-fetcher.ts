@@ -134,6 +134,37 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
     const defuddle = new Defuddle(dom.window.document, { url })
     const result = await defuddle.parseAsync()
     
+    // Pre-process HTML to simplify tables for turndown
+    let processedContent = result.content || ""
+    
+    // Process tables: convert first row to headers and clean up cell content
+    processedContent = processedContent.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (match, tableContent) => {
+      // Remove colgroup
+      let cleaned = tableContent.replace(/<colgroup[^>]*>[\s\S]*?<\/colgroup>/gi, '')
+      
+      // Find all rows
+      const rows = cleaned.match(/<tr[\s\S]*?<\/tr>/gi) || []
+      if (rows.length === 0) return match
+      
+      // Convert first row: replace <td> with <th>
+      let headerRow = rows[0].replace(/<td\b/gi, '<th').replace(/<\/td>/gi, '</th>')
+      // Clean <p> and <span> tags inside header cells
+      headerRow = headerRow.replace(/<(th)[^>]*>\s*<p[^>]*>([\s\S]*?)<\/p>\s*<\/\1>/gi, '<$1>$2</$1>')
+      headerRow = headerRow.replace(/<th[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>\s*<\/th>/gi, '<th>$1</th>')
+      headerRow = headerRow.replace(/<span\b[^>]*>([\s\S]*?)<\/span>/gi, '$1')
+      
+      // Process data rows (keep <td> but clean content)
+      const dataRows = rows.slice(1).map((row: string) => {
+        let cleanedRow = row.replace(/<(td)[^>]*>\s*<p[^>]*>([\s\S]*?)<\/p>\s*<\/\1>/gi, '<$1>$2</$1>')
+        cleanedRow = cleanedRow.replace(/<(td)[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>\s*<\/\1>/gi, '<$1>$2</$1>')
+        cleanedRow = cleanedRow.replace(/<span\b[^>]*>([\s\S]*?)<\/span>/gi, '$1')
+        return cleanedRow
+      })
+      
+      // Rebuild table with thead and tbody
+      return `<table><thead>${headerRow}</thead><tbody>${dataRows.join('')}</tbody></table>`
+    })
+    
     // Convert extracted HTML to Markdown using turndown
     const turndownService = new TurndownService({
       headingStyle: 'atx',
@@ -145,7 +176,7 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
     const { gfm } = await import("turndown-plugin-gfm")
     turndownService.use(gfm)
     
-    const markdown = turndownService.turndown(result.content || "")
+    const markdown = turndownService.turndown(processedContent)
     
     return markdown
   } catch (err) {
