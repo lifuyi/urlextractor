@@ -64,11 +64,37 @@
       status.className = type;
     }
 
-    // Simple markdown to HTML converter
+    // Escape HTML special characters to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Sanitize URL to prevent javascript: protocol attacks
+    function sanitizeUrl(url) {
+      if (!url) return '';
+      const normalized = url.trim().toLowerCase();
+      // Block dangerous protocols
+      if (normalized.startsWith('javascript:') || 
+          normalized.startsWith('data:') || 
+          normalized.startsWith('vbscript:') ||
+          normalized.startsWith('file:')) {
+        return '#';
+      }
+      return url;
+    }
+
+    // Simple markdown to HTML converter with XSS protection
     function markdownToHtml(md) {
-      return md
-        // Code blocks
-        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+      // First escape HTML to prevent injection
+      let html = escapeHtml(md);
+      
+      return html
+        // Code blocks (must be first to preserve content)
+        .replace(/```([\s\S]*?)```/g, (match, code) => {
+          return '<pre><code>' + code + '</code></pre>';
+        })
         // Inline code
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         // Headers
@@ -80,22 +106,15 @@
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         // Images (with no-referrer policy for WeChat images)
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" referrerpolicy="no-referrer" />')
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+          return '<img alt="' + alt + '" src="' + sanitizeUrl(src) + '" referrerpolicy="no-referrer" />';
+        })
         // Links
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, href) => {
+          return '<a href="' + sanitizeUrl(href) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+        })
         // Line breaks
         .replace(/\n/g, '<br>');
-    }
-
-    function generateSlug(url) {
-      try {
-        const urlObj = new URL(url);
-        const path = urlObj.pathname.split('/').filter(Boolean).pop() || '';
-        if (path && path.length > 3) {
-          return path.slice(0, 50).replace(/[^a-zA-Z0-9-]/g, '-');
-        }
-      } catch {}
-      return `article-${Date.now()}`;
     }
 
     async function checkServer() {

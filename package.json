@@ -23,6 +23,8 @@
   "homepage": "https://github.com/lifuyi/urlextractor#readme",
   "dependencies": {
     "defuddle": "^0.10.0",
-    "playwright": "^1.58.2"
+    "jsdom": "^28.1.0",
+    "playwright": "^1.58.2",
+    "turndown": "^7.2.2"
   }
 }

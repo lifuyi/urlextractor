@@ -42,8 +42,11 @@ def fetch_and_convert(url: str, max_chars: int = 0) -> str:
     
     # If no selector matched, use the whole body
     if not html_content:
-        # body is bytes, decode to string
-        html_content = response.body.decode('utf-8') if isinstance(response.body, bytes) else response.body
+        # body is bytes, decode to string with error handling
+        if isinstance(response.body, bytes):
+            html_content = response.body.decode('utf-8', errors='ignore')
+        else:
+            html_content = response.body
         print("Using full body content", file=sys.stderr)
     
     # Convert to Markdown using html2text
