@@ -68,6 +68,26 @@ def fetch_and_convert(url: str, max_chars: int = 0) -> str:
     
     html_content = re.sub(r'<img([^>]*?)data-src=["\']([^"\']+)["\']([^>]*)>', fix_lazy_images, html_content, flags=re.I)
     
+    # Convert video tags to markdown links (html2text ignores video tags)
+    def convert_video_tags(match):
+        video_tag = match.group(0)
+        src_match = re.search(r'\bsrc=["\']([^"\']+)["\']', video_tag, re.I)
+        poster_match = re.search(r'\bposter=["\']([^"\']+)["\']', video_tag, re.I)
+        
+        if not src_match:
+            return ''
+        
+        src = src_match.group(1)
+        poster = poster_match.group(1) if poster_match else None
+        
+        if poster:
+            return f'\n\n![视频封面]({poster})\n\n[🎬 视频]({src})\n\n'
+        return f'\n\n[🎬 视频]({src})\n\n'
+    
+    html_content = re.sub(r'<video[^>]*>.*?</video>', convert_video_tags, html_content, flags=re.I | re.DOTALL)
+    # Also handle self-closing or unclosed video tags
+    html_content = re.sub(r'<video[^>]*>', convert_video_tags, html_content, flags=re.I)
+    
     # Convert to Markdown using html2text
     h = html2text.HTML2Text()
     h.ignore_links = False

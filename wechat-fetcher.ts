@@ -210,6 +210,25 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
     const { gfm } = await import("turndown-plugin-gfm")
     turndownService.use(gfm)
     
+    // Add custom rule for video tags
+    turndownService.addRule('video', {
+      filter: 'video',
+      replacement: (content, node) => {
+        const video = node as Element
+        const src = video.getAttribute('src')
+        const poster = video.getAttribute('poster')
+        
+        if (!src) return ''
+        
+        // If there's a poster, show it as thumbnail with video link below
+        if (poster) {
+          return `\n\n![视频封面](${poster})\n\n[🎬 视频](${src})\n\n`
+        }
+        
+        return `\n\n[🎬 视频](${src})\n\n`
+      }
+    })
+    
     const markdown = turndownService.turndown(processedContent)
     
     return markdown
