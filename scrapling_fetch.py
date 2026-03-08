@@ -49,6 +49,25 @@ def fetch_and_convert(url: str, max_chars: int = 0) -> str:
             html_content = response.body
         print("Using full body content", file=sys.stderr)
     
+    # Fix lazy-loaded images: convert data-src to src (WeChat pattern)
+    import re
+    def fix_lazy_images(match):
+        before = match.group(1)
+        data_src = match.group(2)
+        after = match.group(3)
+        # Check if src already exists
+        if re.search(r'\bsrc=["\']', before + after):
+            src_match = re.search(r'\bsrc=["\']([^"\']+)["\']', before + after, re.I)
+            if src_match and 'mmbiz.qpic.cn' not in src_match.group(1):
+                # Replace placeholder src with data-src
+                new_after = re.sub(r'\bsrc=["\'][^"\']+["\']', '', after, flags=re.I)
+                return f'<img{before}src="{data_src}"{new_after}>'
+            return match.group(0)
+        # No src, add it from data-src
+        return f'<img{before}src="{data_src}"{after}>'
+    
+    html_content = re.sub(r'<img([^>]*?)data-src=["\']([^"\']+)["\']([^>]*)>', fix_lazy_images, html_content, flags=re.I)
+    
     # Convert to Markdown using html2text
     h = html2text.HTML2Text()
     h.ignore_links = False

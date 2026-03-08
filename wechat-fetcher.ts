@@ -128,15 +128,48 @@ async function fetchWithChrome(url: string, timeout: number): Promise<string> {
 async function htmlToMarkdown(html: string, url: string): Promise<string> {
   try {
     const { JSDOM } = await import("jsdom")
-    const { default: Defuddle } = await import("defuddle")
     const { default: TurndownService } = await import("turndown")
     
-    const dom = new JSDOM(html, { url })
-    const defuddle = new Defuddle(dom.window.document, { url })
-    const result = await defuddle.parseAsync()
+    // Fix lazy-loaded images BEFORE any processing (WeChat pattern)
+    // Defuddle and JSDOM both strip data-src, so we must fix images in raw HTML first
+    const fixedHtml = html.replace(/<img([^>]*?)data-src=["']([^"']+)["']([^>]*)>/gi, (match, before, dataSrc, after) => {
+      // Only replace if src is missing or is a placeholder (SVG/data URI)
+      if (/\bsrc=["']/.test(before + after)) {
+        const srcMatch = (before + after).match(/\bsrc=["']([^"']+)["']/i)
+        if (srcMatch && !srcMatch[1].includes('mmbiz.qpic.cn')) {
+          // Replace placeholder src with data-src
+          return `<img${before}src="${dataSrc}"${after.replace(/\bsrc=["'][^"']+["']/i, '')}>`
+        }
+        return match
+      }
+      // No src, add it from data-src
+      return `<img${before}src="${dataSrc}"${after}>`
+    })
     
-    // Pre-process HTML to simplify tables for turndown
-    let processedContent = result.content || ""
+    const dom = new JSDOM(fixedHtml, { url })
+    const doc = dom.window.document
+    
+    // For WeChat articles, use #js_content directly (Defuddle misses images)
+    let processedContent: string
+    const urlObj = new URL(url)
+    const isWeChat = urlObj.hostname === 'mp.weixin.qq.com'
+    
+    if (isWeChat) {
+      const jsContent = doc.querySelector('#js_content')
+      if (jsContent) {
+        processedContent = jsContent.innerHTML
+        console.log("Using #js_content for WeChat article")
+      } else {
+        processedContent = doc.body.innerHTML
+        console.log("#js_content not found, using full body")
+      }
+    } else {
+      // Use Defuddle for other sites
+      const { default: Defuddle } = await import("defuddle")
+      const defuddle = new Defuddle(doc, { url })
+      const result = await defuddle.parseAsync()
+      processedContent = result.content || doc.body.innerHTML
+    }
     
     // Process tables: convert first row to headers and clean up cell content
     processedContent = processedContent.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (match, tableContent) => {
