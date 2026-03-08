@@ -220,9 +220,9 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
         
         if (!src) return ''
         
-        // If there's a poster, show it as thumbnail with video link below
+        // If there's a poster, show image linking to video
         if (poster) {
-          return `\n\n![视频封面](${poster})\n\n[🎬 视频](${src})\n\n`
+          return `\n\n[![视频封面](${poster})](${src})\n\n`
         }
         
         return `\n\n[🎬 视频](${src})\n\n`

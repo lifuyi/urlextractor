@@ -81,7 +81,8 @@ def fetch_and_convert(url: str, max_chars: int = 0) -> str:
         poster = poster_match.group(1) if poster_match else None
         
         if poster:
-            return f'\n\n![视频封面]({poster})\n\n[🎬 视频]({src})\n\n'
+            # Poster image linking to video
+            return f'\n\n[![视频封面]({poster})]({src})\n\n'
         return f'\n\n[🎬 视频]({src})\n\n'
     
     html_content = re.sub(r'<video[^>]*>.*?</video>', convert_video_tags, html_content, flags=re.I | re.DOTALL)
