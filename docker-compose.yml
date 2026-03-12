@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  wechat-fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wechat-fetcher
+    ports:
+      - "3456:3456"
+    environment:
+      - NODE_ENV=production
+      - ALLOWED_ORIGINS=*
+    volumes:
+      # Mount output directory for persistent storage
+      - ./output:/app/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3456/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Security options
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/output
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
