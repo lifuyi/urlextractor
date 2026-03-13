@@ -70,7 +70,8 @@
     const status = document.getElementById('status');
     const content = document.getElementById('content');
     const fileList = document.getElementById('fileList');
-    const API_URL = 'http://localhost:3456';
+    // 自动检测当前服务器地址，支持不同 VPS 部署
+    const API_URL = `${window.location.protocol}//${window.location.host}`;
     
     // Store last fetched data for save functionality
     let lastFetchedData = null;
