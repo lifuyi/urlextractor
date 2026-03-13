@@ -56,7 +56,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 # Install Playwright browsers
-RUN npx playwright install chromium
+RUN bunx playwright install chromium
 
 # Create Python virtual environment
 RUN python3 -m venv .venv
