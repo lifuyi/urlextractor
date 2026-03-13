@@ -294,6 +294,19 @@ async function main() {
       fetch(req) {
         const url = new URL(req.url)
         
+        // 首页 - 返回 HTML 界面
+        if (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/ui") {
+          const htmlPath = `${import.meta.dir}/url-fetcher.html`
+          try {
+            const htmlContent = Bun.file(htmlPath).textSync()
+            return new Response(htmlContent, {
+              headers: { "Content-Type": "text/html; charset=utf-8" }
+            })
+          } catch {
+            return new Response("HTML file not found", { status: 404 })
+          }
+        }
+        
                 if (url.pathname === "/fetch" && req.method === "POST") {
         
                   // Check content length
@@ -445,50 +458,6 @@ async function main() {
           })
         }
 
-        // 静态文件服务 - 支持部署通用版本
-        const pathname = url.pathname
-        
-        // 首页 - 返回 HTML 界面
-        if (pathname === "/" || pathname === "/index.html" || pathname === "/ui") {
-          const htmlPath = `${import.meta.dir}/url-fetcher.html`
-          try {
-            const htmlContent = await Bun.file(htmlPath).text()
-            return new Response(htmlContent, {
-              headers: { "Content-Type": "text/html; charset=utf-8" }
-            })
-          } catch {
-            return new Response("HTML file not found", { status: 404 })
-          }
-        }
-
-        // 其他静态文件（CSS, JS 等）
-        const ext = pathname.split(".").pop()?.toLowerCase()
-        const contentTypes: Record<string, string> = {
-          "css": "text/css",
-          "js": "application/javascript",
-          "json": "application/json",
-          "png": "image/png",
-          "jpg": "image/jpeg",
-          "jpeg": "image/jpeg",
-          "gif": "image/gif",
-          "svg": "image/svg+xml",
-          "ico": "image/x-icon"
-        }
-        
-        if (ext && contentTypes[ext]) {
-          const filePath = `${import.meta.dir}${pathname}`
-          try {
-            const file = Bun.file(filePath)
-            if (await file.exists()) {
-              return new Response(file, {
-                headers: { "Content-Type": contentTypes[ext] }
-              })
-            }
-          } catch {
-            // 文件不存在，继续
-          }
-        }
-        
         return new Response("WeChat Fetcher Server running. POST to /fetch with { url: '...' }", {
           headers: { 
             "Content-Type": "text/plain",
