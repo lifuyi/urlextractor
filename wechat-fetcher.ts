@@ -296,13 +296,17 @@ async function main() {
         
         // 首页 - 返回 HTML 界面
         if (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/ui") {
+          console.log("Serving HTML for pathname:", url.pathname)
           const htmlPath = "./url-fetcher.html"
           try {
-            const htmlContent = Bun.file(htmlPath).textSync()
+            const file = Bun.file(htmlPath)
+            console.log("File exists:", file.exists())
+            const htmlContent = file.textSync()
             return new Response(htmlContent, {
               headers: { "Content-Type": "text/html; charset=utf-8" }
             })
-          } catch {
+          } catch (e) {
+            console.error("Error loading HTML:", e)
             return new Response("HTML file not found", { status: 404 })
           }
         }
