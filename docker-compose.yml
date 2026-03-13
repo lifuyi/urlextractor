@@ -1,4 +1,4 @@
-version: '3.8'
+version: '2.4'
 
 services:
   wechat-fetcher:
@@ -12,28 +12,11 @@ services:
       - NODE_ENV=production
       - ALLOWED_ORIGINS=*
     volumes:
-      # Mount output directory for persistent storage
       - ./output:/app/output
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3456/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    # Security options
+    mem_limit: 2g
+    cpus: 2.0
     read_only: true
     tmpfs:
       - /tmp
       - /app/output
-    security_opt:
-      - no-new-privileges:true
-    # Resource limits (adjust as needed)
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
