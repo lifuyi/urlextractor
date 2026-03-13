@@ -129,12 +129,16 @@
       });
       
       return html
-        // Code blocks (must be first to preserve content)
+        // Code blocks (must be first to preserve content) - escape code content
         .replace(/```([\s\S]*?)```/g, (match, code) => {
-          return '<pre><code>' + code + '</code></pre>';
+          const escapedCode = escapeHtml(code);
+          return '<pre><code>' + escapedCode + '</code></pre>';
         })
-        // Inline code
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Inline code - escape content
+        .replace(/`([^`]+)`/g, (match, code) => {
+          const escapedCode = escapeHtml(code);
+          return '<code>' + escapedCode + '</code>';
+        })
         // Headers
         .replace(/^### (.*$)/gim, '<h3>$1</h3>')
         .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -277,15 +281,29 @@
       a.click();
       URL.revokeObjectURL(downloadUrl);
       
-      // Add to saved files list
+      // Add to saved files list with size limit check
       const li = document.createElement('li');
       li.textContent = `${filename} (${new Date().toLocaleTimeString()})`;
       fileList.insertBefore(li, fileList.firstChild);
       
-      // Also save to localStorage for persistence
-      const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
-      savedFiles.unshift({ filename, url: lastFetchedData.url, time: new Date().toISOString() });
-      localStorage.setItem('savedFiles', JSON.stringify(savedFiles.slice(0, 50)));
+      // Save to localStorage with size limit (max ~500KB to be safe)
+      const MAX_STORAGE_SIZE = 500 * 1024;
+      try {
+        const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+        savedFiles.unshift({ filename, url: lastFetchedData.url, time: new Date().toISOString() });
+        
+        // Check total size and trim if needed
+        let currentSize = JSON.stringify(savedFiles).length;
+        while (currentSize > MAX_STORAGE_SIZE && savedFiles.length > 1) {
+          savedFiles.pop();
+          currentSize = JSON.stringify(savedFiles).length;
+        }
+        
+        localStorage.setItem('savedFiles', JSON.stringify(savedFiles));
+      } catch (e) {
+        // localStorage full or error - clear old entries
+        localStorage.setItem('savedFiles', JSON.stringify([{ filename, url: lastFetchedData.url, time: new Date().toISOString() }]));
+      }
       
       showStatus(`已保存: ${filename}`, 'success');
     });

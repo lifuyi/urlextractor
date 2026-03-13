@@ -3,15 +3,16 @@
 
 import sys
 import argparse
+import re
 from scrapling import Fetcher
 import html2text
 
 
-def fetch_and_convert(url: str, max_chars: int = 0) -> str:
+def fetch_and_convert(url: str, max_chars: int = 0, timeout: int = 30) -> str:
     """Fetch URL using Scrapling and convert to Markdown using html2text"""
     
-    # Use Fetcher (defaults include stealthy behavior)
-    fetcher = Fetcher()
+    # Use Fetcher with timeout and stealthy behavior
+    fetcher = Fetcher(headers={'timeout': str(timeout * 1000)})
     
     # Fetch the page
     response = fetcher.get(url)
@@ -50,7 +51,6 @@ def fetch_and_convert(url: str, max_chars: int = 0) -> str:
         print("Using full body content", file=sys.stderr)
     
     # Fix lazy-loaded images: convert data-src to src (WeChat pattern)
-    import re
     def fix_lazy_images(match):
         before = match.group(1)
         data_src = match.group(2)
@@ -108,11 +108,12 @@ def main():
     parser = argparse.ArgumentParser(description='Fetch URL and convert to Markdown')
     parser.add_argument('url', help='URL to fetch')
     parser.add_argument('--max-chars', type=int, default=0, help='Max characters (0 = no limit)')
+    parser.add_argument('--timeout', type=int, default=30, help='Request timeout in seconds (default: 30)')
     
     args = parser.parse_args()
     
     try:
-        markdown = fetch_and_convert(args.url, args.max_chars)
+        markdown = fetch_and_convert(args.url, args.max_chars, args.timeout)
         print(markdown)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

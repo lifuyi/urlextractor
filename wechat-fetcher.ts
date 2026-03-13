@@ -3,7 +3,7 @@
 const DEFAULT_PORT = 3456
 const DEFAULT_TIMEOUT = 30000
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10MB
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['*']
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3456', 'http://127.0.0.1:3456']
 
 function isValidUrl(url: string): boolean {
   try {
@@ -12,22 +12,43 @@ function isValidUrl(url: string): boolean {
     
     const hostname = parsed.hostname.toLowerCase()
     
-    // Block localhost
-    if (hostname === 'localhost') return false
+    // Block localhost variants
+    if (hostname === 'localhost' || hostname === 'localhost.localdomain') return false
     
-    // Block IPv4 private ranges
-    if (/^127\./.test(hostname)) return false
-    if (/^10\./.test(hostname)) return false
-    if (/^192\.168\./.test(hostname)) return false
-    if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) return false
+    // Block all 127.x.x.x (full loopback range)
+    if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+    
+    // Block 10.x.x.x (private class A)
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+    
+    // Block 192.168.x.x (private class C)
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+    
+    // Block 172.16.x.x - 172.31.x.x (private class B)
+    if (/^172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+    
+    // Block 0.0.0.0
+    if (hostname === '0.0.0.0') return false
     
     // Block IPv6 localhost
-    if (hostname === '::1' || hostname === '[::1]') return false
+    if (hostname === '::1' || hostname === '[::1]' || hostname === '0:0:0:0:0:0:0:1') return false
+    
+    // Block IPv6 unique local addresses (fc00::/7)
+    if (/^fc\d{1,3}:/i.test(hostname) || /^fd\d{1,3}:/i.test(hostname)) return false
     
     // Block cloud metadata endpoints
     if (hostname === '169.254.169.254') return false
     if (hostname === 'metadata.google.internal') return false
     if (hostname === 'instance-data') return false
+    if (hostname === 'metadata.google') return false
+    
+    // Block AWS metadata
+    if (hostname === '169.254.169.253') return false
+    if (hostname === '169.254.169.249') return false
+    if (hostname === '169.254.169.250') return false
+    
+    // Block Azure metadata
+    if (hostname === '169.254.169.254') return false
     
     return true
   } catch {
@@ -257,8 +278,10 @@ async function htmlToMarkdown(html: string, url: string): Promise<string> {
     }
     
     // Use Python scrapling script as fallback
-    const pythonScript = `${import.meta.dir}/scrapling_fetch.py`
-    const venvPython = `${import.meta.dir}/.venv/bin/python`
+    // Use process.cwd() for reliability in Docker and different run contexts
+    const scriptDir = process.cwd()
+    const pythonScript = `${scriptDir}/scrapling_fetch.py`
+    const venvPython = `${scriptDir}/.venv/bin/python`
     const proc = Bun.spawn({
       cmd: [venvPython, pythonScript, url],
       env: { ...process.env },

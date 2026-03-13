@@ -66,7 +66,10 @@ RUN python3 -m venv .venv
 
 # Copy Python requirements and install
 COPY scrapling_fetch.py ./
-RUN .venv/bin/pip install scrapling html2text curl_cffi
+RUN .venv/bin/pip install --no-cache-dir \
+    scrapling==0.4.1 \
+    html2text==2025.4.15 \
+    curl-cffi==0.14.0
 
 # Copy application code
 COPY wechat-fetcher.ts ./

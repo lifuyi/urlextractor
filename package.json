@@ -7,6 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
+    "start": "bun run wechat-fetcher.ts --server",
+    "dev": "bun run wechat-fetcher.ts --server",
+    "fetch": "bun run wechat-fetcher.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

@@ -10,7 +10,9 @@ services:
       - "3456:3456"
     environment:
       - NODE_ENV=production
-      - ALLOWED_ORIGINS=*
+      # ALLOWED_ORIGINS should be set to specific domain in production
+      # e.g., ALLOWED_ORIGINS=https://example.com,https://www.example.com
+      # Default restricts to same-origin requests only
     volumes:
       - ./output:/app/output
     restart: unless-stopped
