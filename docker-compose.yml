@@ -14,7 +14,7 @@ services:
     volumes:
       - ./output:/app/output
     restart: unless-stopped
-    mem_limit: 2g
+    mem_limit: 384m
     cpus: 0.5
     read_only: true
     tmpfs:
