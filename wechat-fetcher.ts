@@ -296,7 +296,7 @@ async function main() {
         
         // 首页 - 返回 HTML 界面
         if (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/ui") {
-          const htmlPath = `${import.meta.dir}/url-fetcher.html`
+          const htmlPath = "./url-fetcher.html"
           try {
             const htmlContent = Bun.file(htmlPath).textSync()
             return new Response(htmlContent, {
