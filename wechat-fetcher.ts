@@ -105,10 +105,25 @@ async function fetchWithChrome(url: string, timeout: number): Promise<string> {
     console.log("启动 Chrome...")
     browser = await chromium.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--window-size=1920,1080",
+        "--start-maximized",
+        "--disable-web-security",
+        "--disable-features=IsolateOrigins,site-per-process"
+      ]
     })
     
     const page = await browser.newPage()
+    
+    // 设置更真实的 User-Agent
+    await page.setExtraHTTPHeaders({
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
     
     console.log(`正在加载: ${url}`)
     await page.goto(url, { waitUntil: "networkidle", timeout })
