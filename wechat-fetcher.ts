@@ -296,12 +296,10 @@ async function main() {
         
         // 首页 - 返回 HTML 界面
         if (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/ui") {
-          console.log("Serving HTML for pathname:", url.pathname)
           const htmlPath = "./url-fetcher.html"
           try {
-            const file = Bun.file(htmlPath)
-            console.log("File exists:", file.exists())
-            const htmlContent = file.textSync()
+            // 使用 Bun.readTextFile 同步读取文件
+            const htmlContent = Bun.readTextFile(htmlPath)
             return new Response(htmlContent, {
               headers: { "Content-Type": "text/html; charset=utf-8" }
             })
