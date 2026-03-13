@@ -291,15 +291,15 @@ async function main() {
     
     Bun.serve({
       port,
-      fetch(req) {
+      async fetch(req) {
         const url = new URL(req.url)
         
         // 首页 - 返回 HTML 界面
         if (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/ui") {
           const htmlPath = "./url-fetcher.html"
           try {
-            // 使用 Bun.readTextFile 同步读取文件
-            const htmlContent = Bun.readTextFile(htmlPath)
+            const file = Bun.file(htmlPath)
+            const htmlContent = await file.text()
             return new Response(htmlContent, {
               headers: { "Content-Type": "text/html; charset=utf-8" }
             })
