@@ -1,4 +1,4 @@
-FROM oven/bun:1.1-debian
+FROM oven/bun:1.2-debian
 
 # Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
